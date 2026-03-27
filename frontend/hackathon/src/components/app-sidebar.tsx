@@ -1,6 +1,5 @@
 import * as React from "react"
 
-import { NavDocuments } from "@/components/nav-documents"
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
@@ -13,162 +12,80 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { LayoutDashboardIcon, ListIcon, ChartBarIcon, FolderIcon, UsersIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon } from "lucide-react"
+import { 
+  LayoutDashboardIcon, 
+  UploadIcon, 
+  FilterIcon, 
+  BarChart3Icon, 
+  FileTextIcon, 
+  Settings2Icon, 
+  CircleHelpIcon, 
+  ShieldAlertIcon 
+} from "lucide-react"
 
 const data = {
   user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
+    name: "PFMEA User",
+    email: "user@pfmea.com",
+    avatar: "/avatars/user.jpg",
   },
   navMain: [
     {
       title: "Dashboard",
       url: "#",
       icon: (
-        <LayoutDashboardIcon
-        />
+        <LayoutDashboardIcon />
       ),
     },
     {
-      title: "Lifecycle",
+      title: "Upload Procedure",
       url: "#",
       icon: (
-        <ListIcon
-        />
+        <UploadIcon />
       ),
     },
     {
-      title: "Analytics",
+      title: "Risk Analysis",
       url: "#",
       icon: (
-        <ChartBarIcon
-        />
+        <ShieldAlertIcon />
       ),
     },
     {
-      title: "Projects",
+      title: "Charts & Reports",
       url: "#",
       icon: (
-        <FolderIcon
-        />
+        <BarChart3Icon />
       ),
     },
     {
-      title: "Team",
+      title: "Procedures",
       url: "#",
       icon: (
-        <UsersIcon
-        />
+        <FileTextIcon />
       ),
-    },
-  ],
-  navClouds: [
-    {
-      title: "Capture",
-      icon: (
-        <CameraIcon
-        />
-      ),
-      isActive: true,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Proposal",
-      icon: (
-        <FileTextIcon
-        />
-      ),
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Prompts",
-      icon: (
-        <FileTextIcon
-        />
-      ),
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
     },
   ],
   navSecondary: [
     {
+      title: "Filters",
+      url: "#",
+      icon: (
+        <FilterIcon />
+      ),
+    },
+    {
       title: "Settings",
       url: "#",
       icon: (
-        <Settings2Icon
-        />
+        <Settings2Icon />
       ),
     },
     {
-      title: "Get Help",
+      title: "Help & Documentation",
       url: "#",
       icon: (
-        <CircleHelpIcon
-        />
-      ),
-    },
-    {
-      title: "Search",
-      url: "#",
-      icon: (
-        <SearchIcon
-        />
-      ),
-    },
-  ],
-  documents: [
-    {
-      name: "Data Library",
-      url: "#",
-      icon: (
-        <DatabaseIcon
-        />
-      ),
-    },
-    {
-      name: "Reports",
-      url: "#",
-      icon: (
-        <FileChartColumnIcon
-        />
-      ),
-    },
-    {
-      name: "Word Assistant",
-      url: "#",
-      icon: (
-        <FileIcon
-        />
+        <CircleHelpIcon />
       ),
     },
   ],
@@ -185,8 +102,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               className="data-[slot=sidebar-menu-button]:p-1.5!"
             >
               <a href="#">
-                <CommandIcon className="size-5!" />
-                <span className="text-base font-semibold">Acme Inc.</span>
+                <ShieldAlertIcon className="size-5!" />
+                <span className="text-base font-semibold">PFMEA Dashboard</span>
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -194,7 +111,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <NavDocuments items={data.documents} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
@@ -203,3 +119,4 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     </Sidebar>
   )
 }
+

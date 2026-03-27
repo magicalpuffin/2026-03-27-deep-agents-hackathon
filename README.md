@@ -6,4 +6,6 @@ Python LangChain agent in `agent/` will read through a file. It should break dow
 
 A reach frontend in `frontend/` will allow viewing the parsed process. It should view each process and pFMEA item. Basic table view and also view in a structured format.
 
+https://ui.shadcn.com/examples/dashboard
+
 Database would store manufacturing process and pFMEA. 

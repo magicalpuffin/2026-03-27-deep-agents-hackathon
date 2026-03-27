@@ -133,10 +133,10 @@ def node_get_pfmea(state: AgentState) -> dict:
 
 
 def node_write_to_db(state: AgentState) -> dict:
-    """Write the pFMEA output to Aerospike."""
-    print("[4/4] Writing to Aerospike...")
+    """Write the pFMEA output to PostgreSQL."""
+    print("[4/4] Writing to PostgreSQL...")
     try:
-        from src.db import AerospikeDB
+        from src.db import PostgresDB
         from src.embeddings import embed_pfmea_item
 
         manufacturing_procedure = state.get("manufacturing_procedure")
@@ -144,7 +144,7 @@ def node_write_to_db(state: AgentState) -> dict:
         assert manufacturing_procedure is not None
         assert pfmea is not None
 
-        db = AerospikeDB()
+        db = PostgresDB()
 
         # Create procedure record
         procedure_id = db.create_procedure(
@@ -186,7 +186,7 @@ def node_write_to_db(state: AgentState) -> dict:
             )
 
         db.close()
-        print(f"       Written procedure {procedure_id} to Aerospike")
+        print(f"       Written procedure {procedure_id} to PostgreSQL")
         return {"procedure_id": procedure_id, "status": "done"}
     except Exception as e:
         print(f"       Write failed: {e}")

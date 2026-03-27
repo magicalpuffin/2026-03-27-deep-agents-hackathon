@@ -19,23 +19,23 @@ from src.api_models import (
     SimilarResult,
     UploadResponse,
 )
-from src.db import AerospikeDB
+from src.db import PostgresDB
 from src.embeddings import embed_query
 
-_db: AerospikeDB | None = None
+_db: PostgresDB | None = None
 
 
-def get_db() -> AerospikeDB:
+def get_db() -> PostgresDB:
     global _db
     if _db is None:
-        _db = AerospikeDB()
+        _db = PostgresDB()
     return _db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _db
-    _db = AerospikeDB()
+    _db = PostgresDB()
     yield
     if _db is not None:
         _db.close()

@@ -4,7 +4,7 @@ tools/vector_search.py — Vector similarity search for pFMEA items
 
 from langchain_core.tools import tool
 
-from src.db import AerospikeDB
+from src.db import PostgresDB
 from src.embeddings import embed_query
 
 
@@ -25,7 +25,7 @@ def search_similar_failure_modes(query: str, top_k: int = 5) -> list[dict]:
     """
     top_k = min(top_k, 10)
     query_embedding = embed_query(query)
-    db = AerospikeDB()
+    db = PostgresDB()
     try:
         results = db.vector_search(query_embedding, limit=top_k)
         return results

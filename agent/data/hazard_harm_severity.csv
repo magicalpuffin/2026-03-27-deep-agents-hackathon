@@ -1,0 +1,111 @@
+Hazard,Harm,Severity
+Biohazard,Respiratory distress,3 Moderate
+Electromagnetic- EMI,Delayed treatment,2 Minor
+Electromagnetic- EMI,Treatment of incorrect volume,3 Moderate
+Electromagnetic- Electrical failure/malfunction,Delayed treatment,2 Minor
+Electromagnetic- Electrical failure/malfunction,Electrical injury,4 Critical
+Electromagnetic- Leakage current,Delayed treatment,3 Moderate
+Electromagnetic- Leakage current,Delayed treatment,2 Minor
+Electromagnetic- Leakage current,Electrical injury,2 Minor
+Electromagnetic- Leakage current,Delayed treatment,1 Negligible
+Electromagnetic- Line voltage,Electrical injury,5 Catastrophic
+Electromagnetic- Line voltage,Delayed treatment,2 Minor
+Electromagnetic- Line voltage,Death,5 Catastrophic
+Electromagnetic- Line voltage,Electrical injury,4 Critical
+Electromagnetic- Line voltage,Electrical injury,3 Moderate
+Environmental- SF6,Delayed treatment,2 Minor
+"Fire, smoke, noxious emissions",Thermal effects,2 Minor
+"Fire, smoke, noxious emissions","Moderate Burn, 2nd degree",3 Moderate
+"Fire, smoke, noxious emissions",Respiratory distress,3 Moderate
+"Fire, smoke, noxious emissions","Major burn, 3rd degree",4 Critical
+"Fire, smoke, noxious emissions","Moderate burn, 2nd degree",3 Moderate
+"Fire, smoke, noxious emissions",Thermal effects,3 Moderate
+Increased treatment time,Delayed treatment,2 Minor
+Increased treatment time,Radiation- minor effects (temporary),2 Minor
+"Liquid egress, leakage (e.g. oil, coolant)",Minor environmental impact,2 Minor
+"Liquid egress, leakage (e.g. oil, coolant)","Moderate burn, 2nd degree",3 Moderate
+"Liquid egress, leakage (e.g. oil, coolant)",Hypersensitivity reaction,2 Minor
+"Liquid egress, leakage (e.g. oil, coolant)",Delayed treatment,2 Minor
+"Liquid egress, leakage (e.g. oil, coolant)",Delayed treatment,1 Negligible
+"Liquid egress, leakage (e.g. oil, coolant)",Electrical injury,4 Critical
+"Liquid egress, leakage (e.g. oil, coolant)",Electrical injury,5 Catastrophic
+Mechanical- Angular positioning,Delayed treatment,2 Minor
+Mechanical- Angular positioning,Treatment of incorrect volume,4 Critical
+Mechanical- Expelled parts,Death,5 Catastrophic
+Mechanical- Expelled parts,"Contusion, moderate",5 Catastrophic
+Mechanical- Expelled parts,Electrical injury,4 Critical
+Mechanical- Expelled parts,Delayed treatment,2 Minor
+Mechanical- Expelled parts,Laceration,3 Moderate
+Mechanical- Expelled parts,"Contusion, moderate",3 Moderate
+"Mechanical- Gravity (falling, suspended masses, tipping)",Broken bone,4 Critical
+"Mechanical- Gravity (falling, suspended masses, tipping)",Death,5 Catastrophic
+"Mechanical- Gravity (falling, suspended masses, tipping)","Contusion, moderate",3 Moderate
+"Mechanical- Gravity (falling, suspended masses, tipping)","Contusion, mild",2 Minor
+Mechanical- Isocenter alignment,Treatment of incorrect volume,4 Critical
+Mechanical- Moving parts,Treatment of incorrect volume,4 Critical
+Mechanical- Moving parts,Laceration,3 Moderate
+Mechanical- Moving parts,Death,5 Catastrophic
+Mechanical- Patient positioning,"Contusion, moderate",3 Moderate
+Mechanical- Patient positioning,Delayed treatment,2 Minor
+Mechanical- Sound,Hearing impairment,4 Critical
+"Mechanical- Trapping, pinching","Contusion, moderate",3 Moderate
+"Mechanical- Trapping, pinching",Broken bone,4 Critical
+Mechanical- Tripping,"Contusion, mild",2 Minor
+Operational- Calibration error,Treatment of incorrect volume,4 Critical
+Operational- Data errors,Treatment of incorrect volume,2 Minor
+Operational- Data errors,Treatment of incorrect volume,3 Moderate
+Operational- Data errors,Radiation- major effects (permanent),4 Critical
+Operational- Data errors,Ineffective treatment,3 Moderate
+Operational- Data errors,Delayed treatment,2 Minor
+Operational- Device stops unexpectedly,Delayed treatment,2 Minor
+Operational- Function,Broken bone,4 Critical
+Operational- Function,Radiation- minor effects (temporary),3 Moderate
+Operational- Function,Electrical injury,3 Moderate
+Operational- Function,Ineffective treatment,3 Moderate
+Operational- Function,"Contusion, moderate",3 Moderate
+Operational- Function,Radiation- major effects (permanent),5 Catastrophic
+Operational- Function,Treatment of incorrect volume,4 Critical
+Operational- Function,Exsposure of ePHI,2 Minor
+Operational- Function,Radiation- major effects (permanent),4 Critical
+Operational- Function,Delayed treatment,1 Negligible
+Operational- Function,Delayed treatment,2 Minor
+Operational- Function,Radiation- minor effects (temporary),2 Minor
+Operational- Function,Minor environmental impact,2 Minor
+Operational- Function,Electrical injury,2 Minor
+Operational- Function,Delayed treatment,3 Moderate
+Operational- Incorrect measurement,Delayed treatment,2 Minor
+Operational- Incorrect output,Electrical injury,2 Minor
+Operational- Patient setup error,Radiation- major effects (permanent),4 Critical
+Operational- Patient setup error,Treatment of incorrect volume,3 Moderate
+Operational- Patient setup error,Treatment of incorrect volume,4 Critical
+Operational- Patient setup error,Radiation- minor effects (temporary),2 Minor
+Radiation- Ionizing,Delayed treatment,2 Minor
+Radiation- Ionizing,Treatment of incorrect volume,2 Minor
+Radiation- Ionizing,Treatment of incorrect volume,3 Moderate
+Radiation- Ionizing,Radiation- minor effects (temporary),4 Critical
+Radiation- Ionizing,Radiation- minor effects (temporary),2 Minor
+Radiation- Ionizing,Minor environmental impact,2 Minor
+Radiation- Ionizing,Radiation- minor effects (temporary),3 Moderate
+Radiation- RF,Ineffective treatment,3 Moderate
+Radiation- RF,"Minor burn, 1st degree",2 Minor
+Radiation- RF,Delayed treatment,1 Negligible
+Radiation- Wrong dose,Radiation- minor effects (temporary),2 Minor
+Radiation- Wrong dose,Treatment of incorrect volume,4 Critical
+Radiation- Wrong dose,Treatment of incorrect volume,2 Minor
+Radiation- Wrong dose,Radiation- major effects (permanent),3 Moderate
+Radiation- Wrong dose,Radiation- major effects (permanent),5 Catastrophic
+Radiation- Wrong dose,Radiation- major effects (permanent),4 Critical
+Radiation- Wrong dose,Radiation- minor effects (temporary),3 Moderate
+Radiation- Wrong dose,Ineffective treatment,3 Moderate
+Radiation- Wrong dose,Delayed treatment,1 Negligible
+Radiation- Wrong dose,Delayed treatment,2 Minor
+Radiation- Wrong dose,Treatment of incorrect volume,3 Moderate
+Radiation- Wrong dose,"Moderate burn, 2nd degree",3 Moderate
+Radiation- Wrong dose,Ineffective treatment,2 Minor
+Slipping,"Contusion, mild",2 Minor
+Slipping,Broken bone,4 Critical
+Slipping,"Contusion, moderate",3 Moderate
+Thermal- General,Delayed treatment,2 Minor
+Thermal- Hot liquids,"Minor burn, 1st degree",2 Minor
+Unauthorized access/activity,Delayed treatment,2 Minor
+Vibration,Delayed treatment,2 Minor

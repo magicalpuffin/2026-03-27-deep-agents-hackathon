@@ -54,7 +54,7 @@ hazards, harms, and severity ratings. Call this for each failure mode.
 - **google_drive_exec**: Search and read files from Google Drive for additional \
 reference material. Use this to find relevant documents such as prior pFMEAs, \
 regulatory standards, or design specifications. \
-Example: entity="files", action="list", params={"q": "name contains 'pFMEA'", "page_size": 5}
+Example: entity="files", action="list", params={{"q": "name contains 'pFMEA'", "page_size": 5}}
 
 Always call at least one hazard lookup tool per process before assigning ratings. \
 Use google_drive_exec to search for relevant reference documents when available.

@@ -3,7 +3,7 @@ utils.py — Document processing utilities
 """
 
 
-def chunk_document(text: str, max_chars: int = 8000, overlap: int = 500) -> list[str]:
+def chunk_document(text: str, max_chars: int = 32000, overlap: int = 1000) -> list[str]:
     """Split text into chunks on paragraph boundaries.
 
     Args:

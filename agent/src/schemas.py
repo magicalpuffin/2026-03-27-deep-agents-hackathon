@@ -26,6 +26,15 @@ class SeverityScale(str, Enum):
     CATASTROPHIC = "catastrophic"
 
 
+SEVERITY_TO_INT = {
+    SeverityScale.NEGLIGIBLE: 1,
+    SeverityScale.MINOR: 2,
+    SeverityScale.MODERATE: 3,
+    SeverityScale.CRITICAL: 4,
+    SeverityScale.CATASTROPHIC: 5,
+}
+
+
 class ManufacturingProcessType(str, Enum):
     ASSEMBLY = "assembly"
     INSPECTION = "inspection"
@@ -40,12 +49,25 @@ class ManufacturingProcess(BaseModel):
         description="Type of process process"
     )
 
+    def to_db_record(self) -> dict:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "process_type": self.process_type.value,
+        }
+
 
 class ManufacturingProcedure(BaseModel):
     title: str = Field(description="Title of the manufacturing procedure")
     process_list: list[ManufacturingProcess] = Field(
         description="List of discrete process which make up the procedure"
     )
+
+    def to_db_record(self) -> dict:
+        return {
+            "title": self.title,
+            "process_count": len(self.process_list),
+        }
 
 
 class ProcessFailureItem(BaseModel):
@@ -72,6 +94,25 @@ class ProcessFailureItem(BaseModel):
     )
     severity_scale: SeverityScale = Field(description="Severity scale description")
 
+    def to_db_record(self) -> dict:
+        return {
+            "summary": self.summary,
+            "process_number": self.process_number,
+            "process_name": self.process_name,
+            "process_requirement": self.process_requirement,
+            "hazard": self.hazard,
+            "hazard_category": self.hazard.split("-")[0].strip() if "-" in self.hazard else self.hazard,
+            "hazardous_situation": self.hazardous_situation,
+            "potential_failure": self.potential_failure,
+            "potential_cause_of_failure": self.potential_cause_of_failure,
+            "harm": self.harm,
+            "severity_rating": self.severity_rating,
+            "severity": SEVERITY_TO_INT.get(self.severity_scale, 3),
+            "probability_of_harm_scale": self.probability_of_harm_scale,
+            "risk_level": self.probability_of_harm_scale,
+            "mitigation": self.potential_cause_of_failure,
+        }
+
 
 class PFMEA(BaseModel):
     title: str = Field(description="Title of the pFMEA")
@@ -85,6 +126,7 @@ class AgentState(TypedDict, total=False):
     raw_text: str
     manufacturing_procedure: Optional[ManufacturingProcedure]
     pfmea: Optional[PFMEA]
+    procedure_id: Optional[str]
     retry_count: int
     platform_response: Optional[dict]
     error: Optional[str]

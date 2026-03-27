@@ -51,8 +51,13 @@ You have access to the following tools — USE THEM rather than guessing:
 hazards, harms, and severity ratings. Call this for each failure mode.
 - **get_severity_for_hazard_category**: Look up all harms for an exact hazard category.
 - **lookup_probability_of_harm**: Look up the risk level from P1/P2 values.
+- **google_drive_exec**: Search and read files from Google Drive for additional \
+reference material. Use this to find relevant documents such as prior pFMEAs, \
+regulatory standards, or design specifications. \
+Example: entity="files", action="list", params={"q": "name contains 'pFMEA'", "page_size": 5}
 
-Always call at least one hazard lookup tool per process before assigning ratings.
+Always call at least one hazard lookup tool per process before assigning ratings. \
+Use google_drive_exec to search for relevant reference documents when available.
 
 ## Coverage
 

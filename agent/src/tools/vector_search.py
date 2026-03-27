@@ -4,8 +4,9 @@ tools/vector_search.py — Vector similarity search for pFMEA items
 
 from langchain_core.tools import tool
 
-from src.db import PostgresDB
+from src.database import get_session
 from src.embeddings import embed_query
+from src import repository
 
 
 @tool
@@ -25,9 +26,5 @@ def search_similar_failure_modes(query: str, top_k: int = 5) -> list[dict]:
     """
     top_k = min(top_k, 10)
     query_embedding = embed_query(query)
-    db = PostgresDB()
-    try:
-        results = db.vector_search(query_embedding, limit=top_k)
-        return results
-    finally:
-        db.close()
+    with get_session() as session:
+        return repository.vector_search(session, query_embedding, limit=top_k)

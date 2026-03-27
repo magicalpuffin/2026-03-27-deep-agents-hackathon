@@ -136,56 +136,58 @@ def node_write_to_db(state: AgentState) -> dict:
     """Write the pFMEA output to PostgreSQL."""
     print("[4/4] Writing to PostgreSQL...")
     try:
-        from src.db import PostgresDB
+        from src.database import get_session
         from src.embeddings import embed_pfmea_item
+        from src import repository
 
         manufacturing_procedure = state.get("manufacturing_procedure")
         pfmea = state.get("pfmea")
         assert manufacturing_procedure is not None
         assert pfmea is not None
 
-        db = PostgresDB()
-
-        # Create procedure record
-        procedure_id = db.create_procedure(
-            title=manufacturing_procedure.title,
-            file_path=state.get("file_path", ""),
-        )
-
-        # Create process records
-        process_ids: dict[str, str] = {}
-        for process in manufacturing_procedure.process_list:
-            process_id = db.create_process(
-                procedure_id=procedure_id,
-                name=process.name,
-                description=process.description,
-                process_type=process.process_type.value,
+        with get_session() as session:
+            # Create procedure record
+            procedure_id = repository.create_procedure(
+                session,
+                title=manufacturing_procedure.title,
+                file_path=state.get("file_path", ""),
             )
-            process_ids[process.name] = process_id
 
-        # Create pFMEA item records
-        for item in pfmea.process_failure_items:
-            record = item.to_db_record()
-            process_key = process_ids.get(item.process_name, item.process_name)
-
-            # Generate embedding
-            try:
-                embedding = embed_pfmea_item(
-                    summary=item.summary,
-                    hazard=item.hazard,
-                    mitigation=item.potential_cause_of_failure,
+            # Create process records
+            process_ids: dict[str, str] = {}
+            for process in manufacturing_procedure.process_list:
+                process_id = repository.create_process(
+                    session,
+                    procedure_id=procedure_id,
+                    name=process.name,
+                    description=process.description,
+                    process_type=process.process_type.value,
                 )
-            except Exception:
-                embedding = None
+                process_ids[process.name] = process_id
 
-            db.create_pfmea_item(
-                procedure_id=procedure_id,
-                process_key=process_key,
-                record=record,
-                embedding=embedding,
-            )
+            # Create pFMEA item records
+            for item in pfmea.process_failure_items:
+                record = item.to_db_record()
+                process_key = process_ids.get(item.process_name, item.process_name)
 
-        db.close()
+                # Generate embedding
+                try:
+                    embedding = embed_pfmea_item(
+                        summary=item.summary,
+                        hazard=item.hazard,
+                        mitigation=item.potential_cause_of_failure,
+                    )
+                except Exception:
+                    embedding = None
+
+                repository.create_pfmea_item(
+                    session,
+                    procedure_id=procedure_id,
+                    process_key=process_key,
+                    record=record,
+                    embedding=embedding,
+                )
+
         print(f"       Written procedure {procedure_id} to PostgreSQL")
         return {"procedure_id": procedure_id, "status": "done"}
     except Exception as e:

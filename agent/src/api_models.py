@@ -87,3 +87,18 @@ class JobStatus(BaseModel):
     status: str
     procedure_id: str | None = None
     error: str | None = None
+
+
+class DriveFile(BaseModel):
+    id: str
+    name: str
+    mime_type: str = ""
+
+
+class DriveSearchResponse(BaseModel):
+    files: list[DriveFile] = []
+
+
+class DriveRunRequest(BaseModel):
+    file_id: str
+    file_name: str = ""

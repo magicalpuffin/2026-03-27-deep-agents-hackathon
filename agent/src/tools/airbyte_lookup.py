@@ -8,6 +8,8 @@ import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
 from langchain_core.tools import tool
+from airbyte_agent_google_drive import GoogleDriveConnector, AirbyteAuthConfig
+
 
 load_dotenv()
 
@@ -40,7 +42,11 @@ def airbyte_lookup(query: str, source_type: str) -> list[dict]:
     """
     table = SOURCE_TABLES.get(source_type)
     if table is None:
-        return [{"error": f"Unknown source_type: {source_type}. Use one of: {list(SOURCE_TABLES.keys())}"}]
+        return [
+            {
+                "error": f"Unknown source_type: {source_type}. Use one of: {list(SOURCE_TABLES.keys())}"
+            }
+        ]
 
     if not DB_URL:
         return [{"error": "DB_URL not configured"}]
@@ -67,6 +73,27 @@ def airbyte_lookup(query: str, source_type: str) -> list[dict]:
         results = [dict(row) for row in cur.fetchall()]
         cur.close()
         conn.close()
-        return results if results else [{"info": f"No results found for '{query}' in {source_type}"}]
+        return (
+            results
+            if results
+            else [{"info": f"No results found for '{query}' in {source_type}"}]
+        )
     except Exception as e:
         return [{"error": f"Database query failed: {e}"}]
+
+
+connector = GoogleDriveConnector(
+    auth_config=AirbyteAuthConfig(
+        connector_id=os.getenv("airbyte_connector_id"),
+        organization_id=os.getenv("airbyte_org_id", ""),
+        airbyte_client_id=os.getenv("airbyte_client_id"),
+        airbyte_client_secret=os.getenv("airbyte_client_secret"),
+    )
+)
+
+
+@tool
+@GoogleDriveConnector.tool_utils
+async def google_drive_exec(entity: str, action: str, params: dict):
+    """Execute Google Drive operations."""
+    return await connector.execute(entity, action, params)

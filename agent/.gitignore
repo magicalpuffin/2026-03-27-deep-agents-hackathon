@@ -2,4 +2,6 @@
 .langgraph_api
 .pytest_cache
 __pycache__
+data/temp/*
+!data/temp/.gitkeep
 

@@ -37,20 +37,34 @@ llm = ChatOpenAI(
 
 
 def node_parse(state: AgentState) -> dict:
-    """Read the file and store its text in state. Supports .docx, .md, and .txt."""
+    """Read the file and store its text in state. Supports .docx, .md, .txt, and .pdf."""
     file_path = state["file_path"]
     print(f"[1/4] Parsing {file_path}...")
 
     path = Path(file_path)
-    if path.suffix.lower() == ".docx":
+    if not path.exists():
+        raise FileNotFoundError(f"File not found: {file_path}")
+
+    suffix = path.suffix.lower()
+    if suffix == ".docx":
         import docx
 
         doc = docx.Document(str(path))
         text_content = "\n\n".join(p.text for p in doc.paragraphs if p.text.strip())
+    elif suffix == ".pdf":
+        import fitz  # PyMuPDF
+
+        pdf = fitz.open(str(path))
+        text_content = "\n\n".join(page.get_text() for page in pdf)
+        pdf.close()
     else:
         text_content = path.read_text()
 
+    if not text_content.strip():
+        raise ValueError(f"Parsed file is empty: {file_path}")
+
     print(f"Document length: {len(text_content):,} chars")
+    print(f"First 200 chars: {text_content[:200]}")
     return {"raw_text": text_content, "status": "parsed"}
 
 
@@ -63,13 +77,14 @@ def node_get_procedures(state: AgentState) -> dict:
 
     results: list[ManufacturingProcedure] = []
     for i, chunk in enumerate(chunks):
-        print(f"       Processing chunk {i + 1}/{len(chunks)}...")
+        print(f"       Processing chunk {i + 1}/{len(chunks)} ({len(chunk)} chars)...")
         messages = [
             SystemMessage(EXTRACTION_PROMPT),
             HumanMessage(f"Parse this manufacturing procedure section:\n\n{chunk}"),
         ]
         result = structured_model.invoke(messages)
         assert isinstance(result, ManufacturingProcedure)
+        print(f"       Chunk {i + 1} -> title='{result.title}', {len(result.process_list)} processes")
         results.append(result)
 
     all_items = []
@@ -78,6 +93,7 @@ def node_get_procedures(state: AgentState) -> dict:
     manufacturing_procedure = ManufacturingProcedure(
         title=results[0].title, process_list=all_items
     )
+    print(f"       Total: {len(all_items)} processes extracted")
 
     return {"manufacturing_procedure": manufacturing_procedure}
 
@@ -101,9 +117,10 @@ def node_get_pfmea(state: AgentState) -> dict:
         pass
 
     try:
-        from src.tools.airbyte_lookup import airbyte_lookup
+        from src.tools.airbyte_lookup import airbyte_lookup, google_drive_exec
 
         tools.append(airbyte_lookup)
+        tools.append(google_drive_exec)
     except Exception:
         pass
 

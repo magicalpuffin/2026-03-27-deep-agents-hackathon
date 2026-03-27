@@ -15,6 +15,9 @@ from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Query, Upload
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api_models import (
+    DriveFile,
+    DriveRunRequest,
+    DriveSearchResponse,
     JobStatus,
     PFMEAItem,
     PFMEAItemDetail,
@@ -56,6 +59,12 @@ def _run_pipeline_job(job_id: str, file_path: str):
                 status="failed",
                 error=str(e),
             )
+    finally:
+        # Clean up the temp file after pipeline completes
+        try:
+            os.remove(file_path)
+        except OSError:
+            pass
 
 
 # ── App setup ─────────────────────────────────────────────────────────────────
@@ -86,21 +95,18 @@ async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File
 
     Returns a job_id that can be polled via GET /api/jobs/{job_id}.
     """
-    upload_dir = os.path.join(tempfile.gettempdir(), "pfmea_uploads")
-    os.makedirs(upload_dir, exist_ok=True)
-
     job_id = str(uuid.uuid4())
     ext = os.path.splitext(file.filename or "upload.txt")[1]
-    file_path = os.path.join(upload_dir, f"{job_id}{ext}")
 
+    tmp = tempfile.NamedTemporaryFile(suffix=ext, prefix=f"{job_id}_", delete=False)
     content = await file.read()
-    with open(file_path, "wb") as f:
-        f.write(content)
+    tmp.write(content)
+    tmp.close()
 
     with _jobs_lock:
         _jobs[job_id] = JobStatus(job_id=job_id, status="processing")
 
-    background_tasks.add_task(_run_pipeline_job, job_id, file_path)
+    background_tasks.add_task(_run_pipeline_job, job_id, tmp.name)
 
     return UploadResponse(
         job_id=job_id,
@@ -252,3 +258,129 @@ async def search_similar(query: str = Query(...), limit: int = Query(default=5, 
             )
             for r in results
         ]
+
+
+# ── Google Drive endpoints ───────────────────────────────────────────────────
+
+
+def _get_drive_connector():
+    from src.tools.airbyte_lookup import connector
+
+    return connector
+
+
+@app.get("/api/drive/search", response_model=DriveSearchResponse)
+async def drive_search(query: str = Query(...), limit: int = Query(default=10, le=50)):
+    """Search Google Drive for files via Airbyte connector.
+
+    Uses the Google Drive API query syntax for the q parameter.
+    e.g. "name contains 'procedure'" or "mimeType = 'application/pdf'"
+    """
+    connector = _get_drive_connector()
+    result = await connector.execute(
+        "files", "list", {"q": query, "page_size": limit}
+    )
+    files = [
+        DriveFile(
+            id=f["id"],
+            name=f["name"],
+            mime_type=f.get("mimeType", ""),
+        )
+        for f in (result.data or [])
+    ]
+    return DriveSearchResponse(files=files)
+
+
+@app.get("/api/drive/files", response_model=DriveSearchResponse)
+async def drive_list_files(limit: int = Query(default=20, le=100)):
+    """List files from Google Drive."""
+    connector = _get_drive_connector()
+    result = await connector.execute("files", "list", {"page_size": limit})
+    files = [
+        DriveFile(
+            id=f["id"],
+            name=f["name"],
+            mime_type=f.get("mimeType", ""),
+        )
+        for f in (result.data or [])
+    ]
+    return DriveSearchResponse(files=files)
+
+
+GOOGLE_EXPORT_MIME = {
+    "application/vnd.google-apps.document": ("text/plain", ".txt"),
+    "application/vnd.google-apps.spreadsheet": ("text/csv", ".csv"),
+    "application/vnd.google-apps.presentation": ("text/plain", ".txt"),
+}
+
+
+async def _drive_download_raw(connector, entity: str, action: str, params: dict) -> bytes:
+    """Execute a download via the Airbyte hosted API, returning raw bytes.
+
+    The standard connector.execute() fails on binary/text downloads because
+    the hosted executor tries to JSON-parse the response. This bypasses that
+    by making the HTTP request directly against the cloud client.
+    """
+    executor = connector._executor
+    cloud_client = executor._cloud_client
+    connector_id = executor._connector_id
+
+    token = await cloud_client.get_bearer_token()
+    url = f"{cloud_client.API_BASE_URL}/api/v1/integrations/connectors/{connector_id}/execute"
+    headers = cloud_client._build_headers(token=token)
+    request_body = {"entity": entity, "action": action, "params": params}
+
+    response = await cloud_client._http_client.post(
+        url, json=request_body, headers=headers
+    )
+    response.raise_for_status()
+    return response.content
+
+
+@app.post("/api/drive/run", response_model=RunResponse, status_code=202)
+async def drive_run(request: DriveRunRequest, background_tasks: BackgroundTasks):
+    """Download a file from Google Drive and start pFMEA analysis.
+
+    Provide the file_id from a drive search result.
+    """
+    connector = _get_drive_connector()
+
+    # Get file metadata to determine type
+    file_meta = await connector.execute("files", "get", {"file_id": request.file_id})
+    mime_type = file_meta.get("mimeType", "") if isinstance(file_meta, dict) else getattr(file_meta, "mimeType", "")
+    file_name = request.file_name or (
+        file_meta.get("name", "download") if isinstance(file_meta, dict) else getattr(file_meta, "name", "download")
+    )
+
+    # Download or export the file content as raw bytes
+    if mime_type in GOOGLE_EXPORT_MIME:
+        export_mime, ext = GOOGLE_EXPORT_MIME[mime_type]
+        content = await _drive_download_raw(
+            connector, "files_export", "download",
+            {"file_id": request.file_id, "mime_type": export_mime},
+        )
+    else:
+        ext = os.path.splitext(file_name)[1] or ".bin"
+        content = await _drive_download_raw(
+            connector, "files", "download",
+            {"file_id": request.file_id, "alt": "media"},
+        )
+
+    # Write to temp file
+    job_id = str(uuid.uuid4())
+    tmp = tempfile.NamedTemporaryFile(
+        suffix=ext, prefix=f"{job_id}_", delete=False
+    )
+    tmp.write(content)
+    tmp.close()
+
+    with _jobs_lock:
+        _jobs[job_id] = JobStatus(job_id=job_id, status="processing")
+
+    background_tasks.add_task(_run_pipeline_job, job_id, tmp.name)
+
+    return RunResponse(
+        job_id=job_id,
+        status="processing",
+        message=f"Google Drive file '{file_name}' downloaded. Processing started.",
+    )

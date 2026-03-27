@@ -2,16 +2,17 @@
 graph.py — LangGraph agent
 
 Four nodes wired into a directed graph:
-  parse → get_procedures → get_pfmea → write
+  parse → get_procedures → get_pfmea → write_to_db
 """
 
-import json
+from pathlib import Path
 
 from dotenv import load_dotenv
-from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph
+from langgraph.prebuilt import create_react_agent
+
 from src.prompts import EXTRACTION_PROMPT, PFMEA_PROMPT
 from src.schemas import PFMEA, AgentState, ManufacturingProcedure
 from src.tools.hazard_lookup import (
@@ -36,14 +37,20 @@ llm = ChatOpenAI(
 
 
 def node_parse(state: AgentState) -> dict:
-    """Read the file and store its text in state."""
+    """Read the file and store its text in state. Supports .docx, .md, and .txt."""
     file_path = state["file_path"]
     print(f"[1/4] Parsing {file_path}...")
 
-    with open(file_path) as f:
-        text_content = f.read()
-        print(f"Document length: {len(text_content):,} chars")
+    path = Path(file_path)
+    if path.suffix.lower() == ".docx":
+        import docx
 
+        doc = docx.Document(str(path))
+        text_content = "\n\n".join(p.text for p in doc.paragraphs if p.text.strip())
+    else:
+        text_content = path.read_text()
+
+    print(f"Document length: {len(text_content):,} chars")
     return {"raw_text": text_content, "status": "parsed"}
 
 
@@ -85,7 +92,22 @@ def node_get_pfmea(state: AgentState) -> dict:
         lookup_probability_of_harm,
     ]
 
-    agent = create_agent(
+    # Optionally add vector search and airbyte tools if available
+    try:
+        from src.tools.vector_search import search_similar_failure_modes
+
+        tools.append(search_similar_failure_modes)
+    except Exception:
+        pass
+
+    try:
+        from src.tools.airbyte_lookup import airbyte_lookup
+
+        tools.append(airbyte_lookup)
+    except Exception:
+        pass
+
+    agent = create_react_agent(
         model=llm,
         tools=tools,
         response_format=PFMEA,
@@ -110,21 +132,64 @@ def node_get_pfmea(state: AgentState) -> dict:
     return {"pfmea": result["structured_response"]}
 
 
-def node_write(state: AgentState) -> dict:
-    """Write the pFMEA output to a JSON file."""
-    print("[4/4] Writing to platform...")
+def node_write_to_db(state: AgentState) -> dict:
+    """Write the pFMEA output to PostgreSQL."""
+    print("[4/4] Writing to PostgreSQL...")
     try:
+        from src.database import get_session
+        from src.embeddings import embed_pfmea_item
+        from src import repository
+
         manufacturing_procedure = state.get("manufacturing_procedure")
         pfmea = state.get("pfmea")
         assert manufacturing_procedure is not None
         assert pfmea is not None
-        output = {
-            "manufacturing_procedure": manufacturing_procedure.model_dump(),
-            "pfmea": pfmea.model_dump(),
-        }
-        with open("pfmea_output.json", "w") as f:
-            json.dump(output, f, indent=2)
-        return {"status": "done"}
+
+        with get_session() as session:
+            # Create procedure record
+            procedure_id = repository.create_procedure(
+                session,
+                title=manufacturing_procedure.title,
+                file_path=state.get("file_path", ""),
+            )
+
+            # Create process records
+            process_ids: dict[str, str] = {}
+            for process in manufacturing_procedure.process_list:
+                process_id = repository.create_process(
+                    session,
+                    procedure_id=procedure_id,
+                    name=process.name,
+                    description=process.description,
+                    process_type=process.process_type.value,
+                )
+                process_ids[process.name] = process_id
+
+            # Create pFMEA item records
+            for item in pfmea.process_failure_items:
+                record = item.to_db_record()
+                process_key = process_ids.get(item.process_name, item.process_name)
+
+                # Generate embedding
+                try:
+                    embedding = embed_pfmea_item(
+                        summary=item.summary,
+                        hazard=item.hazard,
+                        mitigation=item.potential_cause_of_failure,
+                    )
+                except Exception:
+                    embedding = None
+
+                repository.create_pfmea_item(
+                    session,
+                    procedure_id=procedure_id,
+                    process_key=process_key,
+                    record=record,
+                    embedding=embedding,
+                )
+
+        print(f"       Written procedure {procedure_id} to PostgreSQL")
+        return {"procedure_id": procedure_id, "status": "done"}
     except Exception as e:
         print(f"       Write failed: {e}")
         return {"error": str(e), "status": "failed"}
@@ -139,11 +204,30 @@ def build_graph():
     graph.add_node("node_parse", node_parse)
     graph.add_node("node_get_procedures", node_get_procedures)
     graph.add_node("node_get_pfmea", node_get_pfmea)
-    graph.add_node("node_write", node_write)
+    graph.add_node("node_write_to_db", node_write_to_db)
 
     graph.set_entry_point("node_parse")
     graph.add_edge("node_parse", "node_get_procedures")
     graph.add_edge("node_get_procedures", "node_get_pfmea")
-    graph.add_edge("node_get_pfmea", "node_write")
+    graph.add_edge("node_get_pfmea", "node_write_to_db")
 
     return graph.compile()
+
+
+# ── Public API ────────────────────────────────────────────────────────────────
+
+
+def run_pipeline(file_path: str) -> AgentState:
+    """Run the full pFMEA agent pipeline on a file.
+
+    This is the primary Python entry point for running the agent directly.
+    It builds the graph, invokes it synchronously, and returns the final state.
+
+    Args:
+        file_path: Path to a manufacturing procedure file (.docx, .md, .txt).
+
+    Returns:
+        The final agent state dict containing procedure_id, status, and any error.
+    """
+    graph = build_graph()
+    return graph.invoke({"file_path": file_path})

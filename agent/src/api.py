@@ -1,9 +1,13 @@
 """
 api.py — FastAPI application for the pFMEA agent
+
+Provides HTTP endpoints for running the agent pipeline and querying results.
+For direct Python usage, use `src.graph.run_pipeline()` instead.
 """
 
 import os
 import tempfile
+import threading
 import uuid
 from contextlib import asynccontextmanager
 
@@ -11,17 +15,50 @@ from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Query, Upload
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api_models import (
+    JobStatus,
     PFMEAItem,
     PFMEAItemDetail,
     ProcedureDetail,
     ProcedureListItem,
     ProcessItem,
+    RunRequest,
+    RunResponse,
     SimilarResult,
     UploadResponse,
 )
 from src.database import engine, get_session
 from src.embeddings import embed_query
 from src import repository
+
+# ── Job tracking ──────────────────────────────────────────────────────────────
+
+_jobs: dict[str, JobStatus] = {}
+_jobs_lock = threading.Lock()
+
+
+def _run_pipeline_job(job_id: str, file_path: str):
+    """Run the agent pipeline and update job status on completion."""
+    from src.graph import run_pipeline
+
+    try:
+        result = run_pipeline(file_path)
+        with _jobs_lock:
+            _jobs[job_id] = JobStatus(
+                job_id=job_id,
+                status=result.get("status", "done"),
+                procedure_id=result.get("procedure_id"),
+                error=result.get("error"),
+            )
+    except Exception as e:
+        with _jobs_lock:
+            _jobs[job_id] = JobStatus(
+                job_id=job_id,
+                status="failed",
+                error=str(e),
+            )
+
+
+# ── App setup ─────────────────────────────────────────────────────────────────
 
 
 @asynccontextmanager
@@ -40,36 +77,72 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-def _run_pipeline(file_path: str):
-    """Run the agent pipeline on a file (background task)."""
-    from src.graph import build_graph
-
-    graph = build_graph()
-    graph.invoke({"file_path": file_path})
+# ── Pipeline endpoints ────────────────────────────────────────────────────────
 
 
 @app.post("/api/upload", response_model=UploadResponse, status_code=202)
 async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
-    """Upload a manufacturing procedure file and start pFMEA analysis."""
+    """Upload a manufacturing procedure file and start pFMEA analysis.
+
+    Returns a job_id that can be polled via GET /api/jobs/{job_id}.
+    """
     upload_dir = os.path.join(tempfile.gettempdir(), "pfmea_uploads")
     os.makedirs(upload_dir, exist_ok=True)
 
-    file_id = str(uuid.uuid4())
+    job_id = str(uuid.uuid4())
     ext = os.path.splitext(file.filename or "upload.txt")[1]
-    file_path = os.path.join(upload_dir, f"{file_id}{ext}")
+    file_path = os.path.join(upload_dir, f"{job_id}{ext}")
 
     content = await file.read()
     with open(file_path, "wb") as f:
         f.write(content)
 
-    background_tasks.add_task(_run_pipeline, file_path)
+    with _jobs_lock:
+        _jobs[job_id] = JobStatus(job_id=job_id, status="processing")
+
+    background_tasks.add_task(_run_pipeline_job, job_id, file_path)
 
     return UploadResponse(
-        procedure_id=file_id,
+        job_id=job_id,
         status="processing",
         message=f"File '{file.filename}' uploaded. Processing started.",
     )
+
+
+@app.post("/api/run", response_model=RunResponse, status_code=202)
+async def run_from_path(request: RunRequest, background_tasks: BackgroundTasks):
+    """Start pFMEA analysis on a file already on disk.
+
+    Returns a job_id that can be polled via GET /api/jobs/{job_id}.
+    """
+    if not os.path.isfile(request.file_path):
+        raise HTTPException(status_code=400, detail="File not found at given path")
+
+    job_id = str(uuid.uuid4())
+
+    with _jobs_lock:
+        _jobs[job_id] = JobStatus(job_id=job_id, status="processing")
+
+    background_tasks.add_task(_run_pipeline_job, job_id, request.file_path)
+
+    return RunResponse(
+        job_id=job_id,
+        status="processing",
+        message=f"Pipeline started for '{request.file_path}'.",
+    )
+
+
+@app.get("/api/jobs/{job_id}", response_model=JobStatus)
+async def get_job_status(job_id: str):
+    """Poll the status of a pipeline job."""
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+
+# ── Data query endpoints ──────────────────────────────────────────────────────
 
 
 @app.get("/api/procedures", response_model=list[ProcedureListItem])

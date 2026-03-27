@@ -5,11 +5,11 @@ AI agent that analyzes manufacturing procedure documents and generates process F
 ## Architecture
 
 ```
-main.py                  # CLI entry point (run pipeline or start server)
+main.py                  # CLI entry point (direct run or start server)
 src/
-  api.py                 # FastAPI REST API
-  api_models.py          # Pydantic response models
-  graph.py               # LangGraph agent (parse → extract → pFMEA → write)
+  graph.py               # LangGraph agent pipeline + run_pipeline() entry point
+  api.py                 # FastAPI REST API with job tracking
+  api_models.py          # Pydantic request/response models
   schemas.py             # Pydantic state/data models
   models.py              # SQLAlchemy ORM models (Procedure, Process, PFMEAItem)
   database.py            # SQLAlchemy engine & session factory
@@ -42,14 +42,71 @@ uv sync
 # Set environment variables (create .env file)
 DB_URL=postgresql://user:password@localhost:5432/pfmea
 OPENAI_API_KEY=sk-...
+
+# Apply database migrations
+uv run alembic upgrade head
 ```
+
+## Usage
+
+There are two ways to run the agent:
+
+### Method 1: Direct Python
+
+Run the pipeline synchronously on a file. Blocks until complete, prints the procedure ID on success.
+
+```bash
+# From the command line
+uv run python main.py path/to/procedure.docx
+
+# Supports .docx, .md, and .txt files
+uv run python main.py data/example_procedure.md
+```
+
+Or call it from Python code:
+
+```python
+from src.graph import run_pipeline
+
+result = run_pipeline("path/to/procedure.docx")
+print(result["procedure_id"])  # UUID of the created procedure
+print(result["status"])        # "done" or "failed"
+```
+
+### Method 2: FastAPI Server
+
+Start the HTTP server for file uploads, async job tracking, and data queries.
+
+```bash
+uv run python main.py serve
+# Server starts at http://localhost:8000
+# Swagger docs at http://localhost:8000/docs
+```
+
+#### Pipeline Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/upload` | Upload a file and start analysis (returns `job_id`) |
+| `POST` | `/api/run` | Start analysis on a file path already on disk (returns `job_id`) |
+| `GET` | `/api/jobs/{job_id}` | Poll job status — returns `status`, `procedure_id`, `error` |
+
+#### Data Query Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/procedures` | List all analyzed procedures |
+| `GET` | `/api/procedures/{id}` | Get procedure details with processes |
+| `GET` | `/api/procedures/{id}/pfmea` | Get pFMEA items for a procedure |
+| `GET` | `/api/pfmea-items/{id}` | Get a single pFMEA item detail |
+| `GET` | `/api/search/similar?query=...` | Vector similarity search for pFMEA items |
 
 ## Commands
 
 ### Database Migrations
 
 ```bash
-# Apply all migrations (creates tables on first run)
+# Apply all migrations
 uv run alembic upgrade head
 
 # Generate a new migration after model changes
@@ -65,47 +122,35 @@ uv run alembic history
 uv run alembic downgrade -1
 ```
 
-### Run the Agent Pipeline
-
-```bash
-# Analyze a manufacturing procedure document
-uv run python main.py <path-to-file>
-
-# Supports .docx, .md, and .txt files
-uv run python main.py data/example_procedure.docx
-```
-
-### Start the API Server
-
-```bash
-# Start FastAPI server on port 8000 with hot reload
-uv run python main.py serve
-```
-
-### API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/upload` | Upload a procedure file and start analysis |
-| `GET` | `/api/procedures` | List all analyzed procedures |
-| `GET` | `/api/procedures/{id}` | Get procedure details with processes |
-| `GET` | `/api/procedures/{id}/pfmea` | Get pFMEA items for a procedure |
-| `GET` | `/api/pfmea-items/{id}` | Get a single pFMEA item detail |
-| `GET` | `/api/search/similar?query=...` | Vector similarity search for pFMEA items |
-
 ### Testing
 
 ```bash
-# Upload a file for analysis
+# Direct run — analyze a file and check the output
+uv run python main.py data/example_procedure.docx
+
+# Start the server
+uv run python main.py serve
+
+# Upload a file via the API
 curl -X POST http://localhost:8000/api/upload \
   -F "file=@data/example_procedure.docx"
+# Returns: {"job_id": "...", "status": "processing", ...}
+
+# Run pipeline on a file path via the API
+curl -X POST http://localhost:8000/api/run \
+  -H "Content-Type: application/json" \
+  -d '{"file_path": "/absolute/path/to/procedure.docx"}'
+
+# Poll job status until complete
+curl http://localhost:8000/api/jobs/{job_id}
+# Returns: {"job_id": "...", "status": "done", "procedure_id": "...", "error": null}
 
 # List procedures
 curl http://localhost:8000/api/procedures
 
+# Get pFMEA items for a procedure
+curl http://localhost:8000/api/procedures/{procedure_id}/pfmea
+
 # Search for similar failure modes
 curl "http://localhost:8000/api/search/similar?query=solder+joint+failure&limit=5"
-
-# Check API docs (Swagger UI)
-# Open http://localhost:8000/docs in a browser
 ```

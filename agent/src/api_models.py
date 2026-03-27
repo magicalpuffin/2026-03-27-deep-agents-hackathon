@@ -67,6 +67,23 @@ class SimilarResult(BaseModel):
 
 
 class UploadResponse(BaseModel):
-    procedure_id: str
+    job_id: str
     status: str = "processing"
     message: str = "File uploaded and processing started"
+
+
+class RunRequest(BaseModel):
+    file_path: str
+
+
+class RunResponse(BaseModel):
+    job_id: str
+    status: str = "processing"
+    message: str = "Pipeline started"
+
+
+class JobStatus(BaseModel):
+    job_id: str
+    status: str
+    procedure_id: str | None = None
+    error: str | None = None

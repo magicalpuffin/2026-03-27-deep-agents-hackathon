@@ -212,3 +212,22 @@ def build_graph():
     graph.add_edge("node_get_pfmea", "node_write_to_db")
 
     return graph.compile()
+
+
+# ── Public API ────────────────────────────────────────────────────────────────
+
+
+def run_pipeline(file_path: str) -> AgentState:
+    """Run the full pFMEA agent pipeline on a file.
+
+    This is the primary Python entry point for running the agent directly.
+    It builds the graph, invokes it synchronously, and returns the final state.
+
+    Args:
+        file_path: Path to a manufacturing procedure file (.docx, .md, .txt).
+
+    Returns:
+        The final agent state dict containing procedure_id, status, and any error.
+    """
+    graph = build_graph()
+    return graph.invoke({"file_path": file_path})

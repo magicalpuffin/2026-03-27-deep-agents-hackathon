@@ -1,11 +1,32 @@
-## Manufactuirng pFMEA Generator 
+# Manufacturing pFMEA Generator
 
-This project is a document parser designed for manufacturing engineers. Prodcution Parser will read through a manufacturing instruction document and divide it into individual processes. Each proccess would be categorized and evaluate risk assessment and validation.
+A full-stack application that parses manufacturing instruction documents into discrete processes and generates Process Failure Mode and Effects Analysis (pFMEA) assessments using an LLM-powered agent.
 
-Python LangChain agent in `agent/` will read through a file. It should break down a manufacturing procedure into individual processes. 
+Manufacturing engineers upload a procedure document, and the system automatically extracts process steps, identifies potential failure modes, assesses risk severity and probability, and recommends mitigations — all stored and viewable through a web interface.
 
-A reach frontend in `frontend/` will allow viewing the parsed process. It should view each process and pFMEA item. Basic table view and also view in a structured format.
+## Tech Stack
 
-https://ui.shadcn.com/examples/dashboard
+| Layer | Technology |
+|-------|-----------|
+| **Agent** | Python 3.13+, LangGraph, LangChain, OpenAI GPT-4.1-mini |
+| **Database** | Aerospike (KV + Vector Search) |
+| **API** | FastAPI |
+| **Frontend** | React 19, Tailwind CSS, React Router |
+| **Data Integration** | Airbyte |
 
-Database would store manufacturing process and pFMEA. 
+## Project Structure
+
+```
+agent/       — LangGraph pipeline (parse → extract → pFMEA → store)
+frontend/    — React SPA
+docs/        — Architecture documentation
+```
+
+## Documentation
+
+- [System Architecture](docs/architecture.md) — High-level overview and data flow
+- [Agent Pipeline](docs/agent.md) — LangGraph nodes, tools, and prompts
+- [Database Schema](docs/database.md) — Aerospike KV and vector search design
+- [API Endpoints](docs/api.md) — FastAPI routes and request/response schemas
+- [Data Integration](docs/data-integration.md) — Airbyte external data access
+- [Frontend Architecture](docs/frontend.md) — Pages, components, and routing

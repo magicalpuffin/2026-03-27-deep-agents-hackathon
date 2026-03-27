@@ -13,7 +13,7 @@ import type { Procedure, PFMEAItem } from '@/types/pfmea';
  * Base URL for the backend API
  * Defaults to localhost:8000 for development
  */
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 /**
  * Custom error type for API errors
@@ -190,6 +190,90 @@ export async function fetchProcedurePFMEA(procedureId: string): Promise<PFMEAIte
   cache.set(cacheKey, data);
 
   return data;
+}
+
+/**
+ * Upload response from the backend
+ */
+interface UploadResponse {
+  job_id: string;
+  status: string;
+  message: string;
+}
+
+/**
+ * Job status from the backend
+ */
+export interface JobStatus {
+  job_id: string;
+  status: 'processing' | 'done' | 'failed';
+  procedure_id: string | null;
+  error: string | null;
+}
+
+/**
+ * Upload a file to the backend for pFMEA analysis
+ *
+ * @param file - The file to upload
+ * @returns Promise resolving to the upload response with job_id
+ */
+export async function uploadFile(file: File): Promise<UploadResponse> {
+  const url = `${API_BASE_URL}/api/upload`;
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(url, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new APIError(
+      errorData.detail || `Upload failed: HTTP ${response.status}`,
+      response.status,
+      '/api/upload'
+    );
+  }
+
+  return await response.json();
+}
+
+/**
+ * Poll the status of a pipeline job
+ *
+ * @param jobId - The job ID to check
+ * @returns Promise resolving to the current job status
+ */
+export async function fetchJobStatus(jobId: string): Promise<JobStatus> {
+  return fetchAPI<JobStatus>(`/api/jobs/${jobId}`);
+}
+
+/**
+ * Poll a job until it completes, calling onStatus on each poll
+ *
+ * @param jobId - The job ID to poll
+ * @param onStatus - Callback for each status update
+ * @param intervalMs - Polling interval in milliseconds (default: 3000)
+ * @returns Promise resolving to the final job status
+ */
+export async function pollJobUntilDone(
+  jobId: string,
+  onStatus?: (status: JobStatus) => void,
+  intervalMs: number = 3000
+): Promise<JobStatus> {
+  while (true) {
+    const status = await fetchJobStatus(jobId);
+    if (onStatus) onStatus(status);
+
+    if (status.status === 'done' || status.status === 'failed') {
+      // Clear cache so new data shows up
+      cache.clear();
+      return status;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
 }
 
 /**

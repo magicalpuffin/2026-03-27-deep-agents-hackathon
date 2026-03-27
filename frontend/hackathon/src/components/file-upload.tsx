@@ -1,25 +1,29 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { Upload, FileText, X, CheckCircle2, AlertCircle } from "lucide-react"
+import { Upload, FileText, X, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
+import { uploadFile, pollJobUntilDone } from "@/lib/api-client"
 
 interface FileUploadProps {
   onFileUpload?: (file: File) => void
+  onJobComplete?: (procedureId: string) => void
   acceptedFileTypes?: string
   maxFileSizeMB?: number
 }
 
 export function FileUpload({
   onFileUpload,
-  acceptedFileTypes = ".md,.txt,.json",
+  onJobComplete,
+  acceptedFileTypes = ".md,.txt,.json,.docx,.pdf",
   maxFileSizeMB = 10,
 }: FileUploadProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "success" | "error">("idle")
+  const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "processing" | "success" | "error">("idle")
+  const [statusMessage, setStatusMessage] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileSelect = (file: File) => {
@@ -66,20 +70,39 @@ export function FileUpload({
     if (!selectedFile) return
 
     setUploadStatus("uploading")
+    setStatusMessage("Uploading file...")
 
     try {
-      // Simulate upload delay
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      // Call the callback if provided
       if (onFileUpload) {
         onFileUpload(selectedFile)
       }
 
-      setUploadStatus("success")
-      toast.success(`File "${selectedFile.name}" uploaded successfully`)
+      const uploadResult = await uploadFile(selectedFile)
+      setUploadStatus("processing")
+      setStatusMessage("Analyzing procedures and generating pFMEA...")
+      toast.success(`File uploaded. Processing started.`)
+
+      const jobResult = await pollJobUntilDone(uploadResult.job_id, (status) => {
+        if (status.status === "processing") {
+          setStatusMessage("Analyzing procedures and generating pFMEA...")
+        }
+      })
+
+      if (jobResult.status === "done" && jobResult.procedure_id) {
+        setUploadStatus("success")
+        setStatusMessage("")
+        toast.success("pFMEA analysis complete!")
+        if (onJobComplete) {
+          onJobComplete(jobResult.procedure_id)
+        }
+      } else {
+        setUploadStatus("error")
+        setStatusMessage(jobResult.error || "Processing failed")
+        toast.error(jobResult.error || "Processing failed")
+      }
     } catch (error) {
       setUploadStatus("error")
+      setStatusMessage(error instanceof Error ? error.message : "Upload failed")
       toast.error("Failed to upload file")
       console.error("Upload error:", error)
     }
@@ -183,7 +206,7 @@ export function FileUpload({
           </div>
 
           {/* Upload Button */}
-          {selectedFile && uploadStatus !== "success" && (
+          {selectedFile && uploadStatus !== "success" && uploadStatus !== "processing" && (
             <Button
               onClick={handleUpload}
               disabled={uploadStatus === "uploading"}
@@ -191,7 +214,7 @@ export function FileUpload({
             >
               {uploadStatus === "uploading" ? (
                 <>
-                  <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Uploading...
                 </>
               ) : (
@@ -203,12 +226,22 @@ export function FileUpload({
             </Button>
           )}
 
+          {/* Processing Message */}
+          {uploadStatus === "processing" && (
+            <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950/20">
+              <div className="flex items-center gap-2 text-sm text-blue-800 dark:text-blue-400">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>{statusMessage || "Processing..."}</span>
+              </div>
+            </div>
+          )}
+
           {/* Success Message */}
           {uploadStatus === "success" && (
             <div className="rounded-lg bg-green-50 p-3 dark:bg-green-950/20">
               <div className="flex items-center gap-2 text-sm text-green-800 dark:text-green-400">
                 <CheckCircle2 className="h-4 w-4" />
-                <span>File uploaded successfully! Processing PFMEA data...</span>
+                <span>pFMEA analysis complete! Dashboard updated.</span>
               </div>
             </div>
           )}
@@ -218,7 +251,7 @@ export function FileUpload({
             <div className="rounded-lg bg-red-50 p-3 dark:bg-red-950/20">
               <div className="flex items-center gap-2 text-sm text-red-800 dark:text-red-400">
                 <AlertCircle className="h-4 w-4" />
-                <span>Upload failed. Please try again.</span>
+                <span>{statusMessage || "Upload failed. Please try again."}</span>
               </div>
             </div>
           )}

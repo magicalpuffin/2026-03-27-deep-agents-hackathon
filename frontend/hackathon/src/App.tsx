@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
@@ -9,135 +9,58 @@ import { RiskDistributionChart } from "@/components/risk-distribution-chart"
 import { SeverityDistributionChart } from "@/components/severity-distribution-chart"
 import { ProcessTypeChart } from "@/components/process-type-chart"
 import { FileUpload } from "@/components/file-upload"
-import { toast } from "sonner"
 
+import { fetchProcedures, fetchProcedurePFMEA, clearCache } from "@/lib/api-client"
 import { prepareChartData } from "@/lib/filters"
 import type { RiskLevel, ProcessType, PFMEAItem, Procedure } from "@/types/pfmea"
 
-// Sample PFMEA data for demonstration
-const sampleProcedures: Procedure[] = [
-  {
-    procedure_id: "proc-1",
-    title: "Linear Accelerator Alignment",
-    file_path: "/procedures/linac-alignment.md",
-  },
-  {
-    procedure_id: "proc-2",
-    title: "Radiation Safety Check",
-    file_path: "/procedures/radiation-safety.md",
-  },
-  {
-    procedure_id: "proc-3",
-    title: "Beam Calibration",
-    file_path: "/procedures/beam-calibration.md",
-  },
-]
-
-const samplePFMEAItems: PFMEAItem[] = [
-  {
-    item_id: "1",
-    procedure_id: "proc-1",
-    process_key: "step-1",
-    summary: "Misalignment during assembly",
-    hazard: "Beam misalignment",
-    hazard_category: "Electrical",
-    severity: 5,
-    risk_level: "very_high",
-    mitigation: "Implement automated alignment verification",
-    process_type: "assembly",
-  },
-  {
-    item_id: "2",
-    procedure_id: "proc-1",
-    process_key: "step-2",
-    summary: "Calibration drift over time",
-    hazard: "Inaccurate beam delivery",
-    hazard_category: "Mechanical",
-    severity: 4,
-    risk_level: "high",
-    mitigation: "Schedule regular calibration checks",
-    process_type: "calibration",
-  },
-  {
-    item_id: "3",
-    procedure_id: "proc-2",
-    process_key: "step-1",
-    summary: "Radiation exposure during maintenance",
-    hazard: "Personnel exposure",
-    hazard_category: "Radiation",
-    severity: 5,
-    risk_level: "very_high",
-    mitigation: "Enforce lockout/tagout procedures",
-    process_type: "inspection",
-  },
-  {
-    item_id: "4",
-    procedure_id: "proc-2",
-    process_key: "step-2",
-    summary: "Incomplete safety checklist",
-    hazard: "Missed safety hazards",
-    hazard_category: "Procedural",
-    severity: 3,
-    risk_level: "moderate",
-    mitigation: "Implement digital checklist with mandatory fields",
-    process_type: "inspection",
-  },
-  {
-    item_id: "5",
-    procedure_id: "proc-3",
-    process_key: "step-1",
-    summary: "Beam energy variation",
-    hazard: "Incorrect dose delivery",
-    hazard_category: "Electrical",
-    severity: 4,
-    risk_level: "high",
-    mitigation: "Install real-time energy monitoring",
-    process_type: "test",
-  },
-  {
-    item_id: "6",
-    procedure_id: "proc-3",
-    process_key: "step-2",
-    summary: "Documentation error",
-    hazard: "Incorrect procedure execution",
-    hazard_category: "Procedural",
-    severity: 2,
-    risk_level: "low",
-    mitigation: "Implement peer review process",
-    process_type: "test",
-  },
-  {
-    item_id: "7",
-    procedure_id: "proc-1",
-    process_key: "step-3",
-    summary: "Component wear",
-    hazard: "Equipment failure",
-    hazard_category: "Mechanical",
-    severity: 3,
-    risk_level: "moderate",
-    mitigation: "Establish preventive maintenance schedule",
-    process_type: "assembly",
-  },
-  {
-    item_id: "8",
-    procedure_id: "proc-2",
-    process_key: "step-3",
-    summary: "Interlock bypass",
-    hazard: "Safety system failure",
-    hazard_category: "Electrical",
-    severity: 5,
-    risk_level: "very_high",
-    mitigation: "Install tamper-evident seals on interlocks",
-    process_type: "inspection",
-  },
-]
-
 export function App() {
+  // Data state
+  const [procedures, setProcedures] = useState<Procedure[]>([])
+  const [pfmeaItems, setPfmeaItems] = useState<PFMEAItem[]>([])
+  const [loading, setLoading] = useState(true)
+
   // Filter state
   const [selectedProcedureId, setSelectedProcedureId] = useState<string | "all">("all")
   const [selectedRiskLevels, setSelectedRiskLevels] = useState<RiskLevel[]>([])
   const [selectedSeverities, setSelectedSeverities] = useState<number[]>([])
   const [selectedProcessTypes, setSelectedProcessTypes] = useState<ProcessType[]>([])
+
+  // Load all data from the API
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const procs = await fetchProcedures()
+      setProcedures(procs)
+
+      // Fetch pFMEA items for all procedures
+      const allItems: PFMEAItem[] = []
+      for (const proc of procs) {
+        try {
+          const items = await fetchProcedurePFMEA(proc.procedure_id)
+          allItems.push(...items)
+        } catch {
+          console.warn(`Failed to fetch pFMEA for ${proc.procedure_id}`)
+        }
+      }
+      setPfmeaItems(allItems)
+    } catch (error) {
+      console.error("Failed to load data:", error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // Load data on mount
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  // Filter items by selected procedure
+  const filteredItems = useMemo(() => {
+    if (selectedProcedureId === "all") return pfmeaItems
+    return pfmeaItems.filter((item) => item.procedure_id === selectedProcedureId)
+  }, [pfmeaItems, selectedProcedureId])
 
   // Clear all filters
   const handleClearFilters = () => {
@@ -147,18 +70,18 @@ export function App() {
     setSelectedProcessTypes([])
   }
 
-  // Prepare chart data
+  // Prepare chart data from filtered items
   const riskData = useMemo(
-    () => prepareChartData(samplePFMEAItems, "risk_level"),
-    []
+    () => prepareChartData(filteredItems, "risk_level"),
+    [filteredItems]
   )
   const severityData = useMemo(
-    () => prepareChartData(samplePFMEAItems, "severity"),
-    []
+    () => prepareChartData(filteredItems, "severity"),
+    [filteredItems]
   )
   const processTypeData = useMemo(
-    () => prepareChartData(samplePFMEAItems, "process_type"),
-    []
+    () => prepareChartData(filteredItems, "process_type"),
+    [filteredItems]
   )
 
   // Handle chart clicks
@@ -170,16 +93,11 @@ export function App() {
     setSelectedProcessTypes([processType])
   }
 
-  // Handle file upload
-  const handleFileUpload = (file: File) => {
-    console.log("File uploaded:", file.name)
-    toast.success(`Processing file: ${file.name}`)
-    // TODO: Implement actual file processing logic
-    // This would typically involve:
-    // 1. Reading the file content
-    // 2. Parsing the procedure data
-    // 3. Calling the backend API to process PFMEA
-    // 4. Updating the dashboard with new data
+  // Handle completed upload — refresh data and select the new procedure
+  const handleJobComplete = async (procedureId: string) => {
+    clearCache()
+    await loadData()
+    setSelectedProcedureId(procedureId)
   }
 
   return (
@@ -206,13 +124,13 @@ export function App() {
 
               {/* File Upload */}
               <div className="px-4 lg:px-6">
-                <FileUpload onFileUpload={handleFileUpload} />
+                <FileUpload onJobComplete={handleJobComplete} />
               </div>
 
               {/* Filter Bar */}
               <div className="px-4 lg:px-6">
                 <FilterBar
-                  procedures={sampleProcedures}
+                  procedures={procedures}
                   selectedProcedureId={selectedProcedureId}
                   selectedRiskLevels={selectedRiskLevels}
                   selectedSeverities={selectedSeverities}
@@ -227,17 +145,27 @@ export function App() {
 
               {/* Charts Grid */}
               <div className="px-4 lg:px-6">
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  <RiskDistributionChart
-                    data={riskData}
-                    onSegmentClick={handleRiskLevelClick}
-                  />
-                  <SeverityDistributionChart data={severityData} />
-                  <ProcessTypeChart
-                    data={processTypeData}
-                    onSegmentClick={handleProcessTypeClick}
-                  />
-                </div>
+                {loading ? (
+                  <div className="flex items-center justify-center py-12 text-muted-foreground">
+                    Loading data...
+                  </div>
+                ) : pfmeaItems.length === 0 ? (
+                  <div className="flex items-center justify-center py-12 text-muted-foreground">
+                    No pFMEA data yet. Upload a procedure file to get started.
+                  </div>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <RiskDistributionChart
+                      data={riskData}
+                      onSegmentClick={handleRiskLevelClick}
+                    />
+                    <SeverityDistributionChart data={severityData} />
+                    <ProcessTypeChart
+                      data={processTypeData}
+                      onSegmentClick={handleProcessTypeClick}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>

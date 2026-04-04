@@ -1,8 +1,16 @@
 # Manufacturing pFMEA Generator
 
+**Third Place Winner for "Best Use of Kiro" at Deep Agents Hackathon**
+
+
+![pfmea dashboard](/docs/assets/pfmea%20dashboard.png)
+
+
 A full-stack application that parses manufacturing instruction documents into discrete processes and generates Process Failure Mode and Effects Analysis (pFMEA) assessments using an LLM-powered agent.
 
 Manufacturing engineers upload a procedure document, and the system automatically extracts process steps, identifies potential failure modes, assesses risk severity and probability, and recommends mitigations — all stored and viewable through a web interface.
+
+![pfmea agent](/docs/assets/pfmea%20agent%20graph.png)
 
 ## Tech Stack
 
